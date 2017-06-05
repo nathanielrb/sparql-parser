@@ -73,16 +73,20 @@
   (print "lexical error on stream: " s)
   `(error))
 
+(define (lit/sp str)
+  (between-fws (char-list/lit str)))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Grammar
+;; Production for terminals
 
-(define PNAME_NS*
-  (concatenation
-   (repetition1 char-list/alpha) (char-list/lit ":")))
+;; PN_LOCAL_ESC
 
-(define PNAME_NS
-  (bind-consumed->symbol PNAME_NS*))
+;; HEX
 
+;; PERCENT
+
+;; PLX
 
 (define PN_LOCAL  ;; **
   (:+
@@ -91,56 +95,13 @@
     char-list/alpha
     (set-from-string "-_%"))))
 
-(define PNAME_LN
-  (concatenation PNAME_NS* PN_LOCAL)) 
-
-(define PN_CHARS_BASE
-  (alternatives
-   char-list/decimal
-   char-list/alpha)) ;; **
-;;   (set-from-string "_")
-
-(define PN_CHARS_U
-  (alternatives
-   PN_CHARS_BASE
-   (set-from-string "_")))
+;; PN_PREFIX
 
 (define PN_CHARS
-  (alternatives
-   PN_CHARS_U
-   (set-from-string "-"))) ;; ** !!
-
-(define IRIREF*
-   (between-fws
-    (concatenation
-     (char-list/lit "<http://")
-     (repetition1 
-      (alternatives ;; should be list-from-string
-       char-list/alpha
-       (char-list/lit ".")
-       (char-list/lit "/")))
-     (char-list/lit ">"))))
-
-(define IRIREF
-  (bind-consumed->symbol IRIREF*))
-
-(define PrefixDecl
-  (bind-consumed-values->list
-   (concatenation
-    (bind-consumed->symbol
-     (between-fws (char-list/lit "PREFIX")))
-    PNAME_NS
-    IRIREF)))
-
-;(define PrefixDecl
- ; (bind-consumed-values->alist 'Prefix PrefixDecl*))
-
-(define Prologue* (repetition PrefixDecl))
-
-(define Prologue (bind-consumed-values->alist '*PROLOGUE* Prologue*))
-
-(define (lit/sp str)
-  (between-fws (char-list/lit str)))
+  (vac
+   (alternatives
+    PN_CHARS_U
+    (set-from-string "-")))) ;; ** !!
 
 (define varname
   (:+
@@ -149,123 +110,67 @@
     char-list/alpha
     (set-from-string "-_"))))
 
-(define Var*
-  (alternatives
-   (concatenation (char-list/lit "?") varname)
-   (concatenation (char-list/lit "$") varname)))
-
-(define Var
-  (bind-consumed->symbol Var*))
-
-(define Expression (lit/sp "?b")) ;; **
-
-(define SelectClause
-  (bind-consumed-values->list
-  (concatenation
-   (bind-consumed->symbol (lit/sp "SELECT"))
-   (optional-sequence
-    (alternatives (lit/sp "DISTINCT") (lit/sp "REDUCED")))
-   (alternatives
-    (repetition1
-     (between-fws 
-      (alternatives
-       Var
-       (concatenation (lit/sp "(") Expression (lit/sp "AS") Var (lit/sp ")")))))
-    (lit/sp "*")))))
-
-;(define SelectClause
- ; (bind-consumed-values->alist 'Select SelectClause*))
-
-(define PrefixedName
-  (bind-consumed->symbol
-   (between-fws
-    (alternatives PNAME_LN PNAME_NS))))
-
-(define iri
-  (alternatives IRIREF PrefixedName))
-
-(define VarOrIri
-  (alternatives Var iri))
-
-(define SourceSelector iri)
-
-(define DefaultGraphClause SourceSelector)
-
-(define NamedGraphClause
-  (concatenation
-   (bind-consumed->symbol (lit/sp "NAMED"))
-   SourceSelector))
-
-(define DatasetClause
-  (bind-consumed-values->list
-   (concatenation
-    (bind-consumed->symbol (lit/sp "FROM"))
-    (alternatives DefaultGraphClause
-		  NamedGraphClause))))
-
-(define GroupGraphPattern 
+(define PN_CHARS_U
   (vac
-   (:: (drop-consumed (lit/sp "{"))
-       GroupGraphPatternSub
-       ;;(alternatives SubSelect GroupGraphPatternSub)
-       (drop-consumed (lit/sp "}")))))
+   (alternatives
+    PN_CHARS_BASE
+    (set-from-string "_"))))
 
-(define GraphGraphPattern
-  (:: (lit/sp "GRAPH")
-      VarOrIri
-      GroupGraphPattern))
+(define PN_CHARS_BASE
+  (vac
+   (alternatives
+    char-list/decimal
+    char-list/alpha))) ;; **
+;;   (set-from-string "_")
 
-(define OptionalGraphPattern
-  (:: (lit/sp "OPTIONAL") VarOrIri GroupGraphPattern))
+(define ANON
+   (:: (lit/sp "[") (lit/sp "]")))
 
-(define GroupOrUnionGraphPattern
-  (::
-   GroupGraphPattern
-   (:* (::
-	(lit/sp "UNION") GroupGraphPattern))))
+;; WS
 
-(define MinusGraphPattern
-  (:: (lit/sp "MINUS") GroupGraphPattern))
-
-(define GraphPatternNotTriples
-  (alternatives GroupOrUnionGraphPattern OptionalGraphPattern
-		MinusGraphPattern GraphGraphPattern))
+(define NIL
+  (:: (lit/sp "(") (lit/sp ")")))
 
 (define ECHAR
   (:: (char-list/lit "\\")
       (set-from-string "tbnrf\\\"'")))
 
+;; ??? for stringliterals
 (define STRINGCHAR
   (alternatives
    char-list/decimal
    char-list/alpha)) ;; **
 
-(define String
-  (alternatives
-   (::  (char-list/lit "'")
-	(repetition
-	 (alternatives
-	  STRINGCHAR ECHAR))
-	(char-list/lit "'"))))
+;; STRING_LITERAL_LONG2/LONG1/1/2
 
-(define RDFLiteral
-  (:: String)) ;; ( LANGTAG | ( '^^' iri ) )?
+;; Exponent
 
-(define NumericLiteral
-   (::
-    (:? (alternatives
-	 (char-list/lit "-")
-	 (char-list/lit "+")))
-    (:* char-list/decimal)
-    (:? (char-list/lit "+"))
-    (:+ char-list/decimal)))
+;; DOUBLE_NEGATIVE
 
-(define BooleanLiteral
-   (alternatives
-    (lit/sp "true")
-    (lit/sp "false")))
+;; DECIMAL_NEGATIVE
+
+;; INTEGER_NEGATIVE
+
+;; DOUBLE_POSITIVE
+
+;; DECIMAL_POSITIVE
+
+;; INTEGER_POSITIVE
+
+;; DOUBLE
+
+;; DECIMAL
+
+;; INTEGER
+
+;; LANGTAG
+
+;; VAR2
+
+;; VAR1
 
 (define BLANK_NODE_LABEL
+  (vac
    (::
    (char-list/lit "_:")
    (alternatives PN_CHARS_U
@@ -276,26 +181,160 @@
      (:* (alternatives
 	  PN_CHARS
 	  (char-list/lit ".")))
-     PN_CHARS))))
-   
-(define ANON
-   (:: (lit/sp "[") (lit/sp "]")))
+     PN_CHARS)))))
+
+(define PNAME_LN
+  (vac
+   (concatenation PNAME_NS PN_LOCAL)) )
+
+(define PNAME_NS
+  (bind-consumed->symbol
+   (concatenation
+    (repetition1 char-list/alpha) (char-list/lit ":"))))
+
+(define IRIREF
+  (bind-consumed->symbol
+   (between-fws
+    (concatenation
+     (char-list/lit "<http://")
+     (repetition1 
+      (alternatives ;; should be list-from-string
+       char-list/alpha
+       (char-list/lit ".")
+       (char-list/lit "/")))
+     (char-list/lit ">")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Grammar
 
 (define BlankNode
    (alternatives BLANK_NODE_LABEL ANON))
 
-(define NIL
-   (:: (lit/sp "(") (lit/sp ")")))
+(define PrefixedName
+  (bind-consumed->symbol
+   (between-fws
+    (alternatives PNAME_LN PNAME_NS))))
+
+(define iri
+  (alternatives IRIREF PrefixedName))
+
+(define String
+  (alternatives
+   (::  (char-list/lit "'")
+	(repetition
+	 (alternatives
+	  STRINGCHAR ECHAR))
+	(char-list/lit "'"))))
+
+(define BooleanLiteral
+   (alternatives
+    (lit/sp "true")
+    (lit/sp "false")))
+
+;; NUMERICLITERALNEGATIVE/Positive/Unsigned
+
+(define NumericLiteral
+   (::
+    (:? (alternatives
+	 (char-list/lit "-")
+	 (char-list/lit "+")))
+    (:* char-list/decimal)
+    (:? (char-list/lit "+"))
+    (:+ char-list/decimal)))
+
+(define RDFLiteral
+  (:: String)) ;; ( LANGTAG | ( '^^' iri ) )?
+
+;; iriOrFunction
+
+;; Aggregate
+
+;; NotExistsFunction
+
+;; ExistsFunc
+
+;; StrReplaceExpression
+
+;; SubstringExpression
+
+;; RegexExpression
+
+;; BuiltInCall
+
+;; BrackettedExpression
+
+;; PrimaryExpression
+
+;; UnaryExpression
+
+;; MutiplicativeExpression
+
+;; AdditiveExpression
+					;
+;; RelationalExpression
+
+;; ValueLogical
+
+;; ConditionalAndExpression
+
+;; ConditionalOrExpression
+
+(define Expression (lit/sp "?b")) ;; **
 
 (define GraphTerm
    (alternatives
     iri RDFLiteral NumericLiteral BooleanLiteral BlankNode NIL))
 
+(define Var
+  (bind-consumed->symbol
+   (alternatives
+    (concatenation (char-list/lit "?") varname)
+    (concatenation (char-list/lit "$") varname))))
+
+(define VarOrIri
+  (alternatives Var iri))
+
 (define VarOrTerm
   (alternatives Var GraphTerm))
 
-(define PathMod
-  (set-from-string "?*+"))
+(define GraphNodePath
+  (vac
+   (alternatives
+    VarOrTerm TriplesNodePath)))
+
+(define GraphNode
+  (vac
+   (alternatives
+    VarOrTerm TriplesNode)))
+
+(define CollectionPath
+  (vac
+    (:: (lit/sp "(")
+	(:+ GraphNodePath)
+	(lit/sp ")"))))
+
+(define Collection
+  (vac
+    (:: (lit/sp "(")
+	(:+ GraphNode)
+	(lit/sp ")"))))
+
+
+;; BlankNodePropertyListPath
+
+(define TriplesNodePath
+  (alternatives CollectionPath )) ;; BlankNodePropertyListPath)) ;; ** !!
+
+;; BlankNodePropertyList
+
+(define TriplesNode
+   (alternatives Collection)) ;; BlankNodePropertyList ;; ** !!
+
+;; Integer
+
+;; PathOneInPropertySet
+
+;; PathNegatedPropertySet
 
 (define PathPrimary
   (vac
@@ -305,11 +344,15 @@
      ;; (:: (char-list/lit "!") PathNegatedPropertySet) ;; ** !!
      (:: (lit/sp "(") Path (lit/sp ")")))))
 
-(define PathElt
-   (:: PathPrimary (:? PathMod)))
+(define PathMod
+  (set-from-string "?*+"))
 
 (define PathEltOrInverse
-   (alternatives PathElt (:: (char-list/lit "^") PathElt)))
+  (vac
+   (alternatives PathElt (:: (char-list/lit "^") PathElt))))
+
+(define PathElt
+   (:: PathPrimary (:? PathMod)))
 
 (define PathSequence
   (:: PathEltOrInverse
@@ -322,51 +365,17 @@
 
 (define Path PathAlternative)
 
-(define VerbPath Path)
-
-(define VerbSimple Var)
-
-(define Collection
-  (vac
-    (:: (lit/sp "(")
-	(:+ GraphNode)
-	(lit/sp ")"))))
-
-(define CollectionPath
-  (vac
-    (:: (lit/sp "(")
-	(:+ GraphNodePath)
-	(lit/sp ")"))))
-
-(define TriplesNode
-   (alternatives Collection)) ;; BlankNodePropertyList ;; ** !!
-
-(define TriplesNodePath
-  (alternatives CollectionPath )) ;; BlankNodePropertyListPath)) ;; ** !!
-
-(define GraphNodePath
-   (alternatives
-    VarOrTerm TriplesNodePath))
-
 (define ObjectPath GraphNodePath)
-
-(define GraphNode
-   (alternatives
-    VarOrTerm TriplesNode))
-
-(define Object GraphNode)
-
-(define ObjectList
-   (:: Object
-       (:*
-	(:: (lit/sp ",")
-	    Object))))
 
 (define	ObjectListPath
    (:: ObjectPath
        (:*
 	(:: (lit/sp ",")
 	    ObjectPath))))
+
+(define VerbSimple Var)
+
+(define VerbPath Path)
 
 (define PropertyListPathNotEmpty
    (::
@@ -390,13 +399,83 @@
    (:: (between-fws TriplesNodePath)
        (between-fws PropertyListPath))))
 
+(define Object GraphNode)
+
+(define ObjectList
+   (:: Object
+       (:*
+	(:: (lit/sp ",")
+	    Object))))
+
+
+;; Verb
+
+;; PropertyListNotEmpty
+
+;; PropertyList
+
+;; TriplesSameSubject
+
+;; ConstructTriples
+
+;; ConstructTemplate
+
+;; ExpressionList
+
+;; ArgList
+
+;; FunctionCall
+
+;; Constraint
+
+;; Filter
+
+(define GroupOrUnionGraphPattern
+  (vac
+   (::
+    GroupGraphPattern
+    (:* (::
+	 (lit/sp "UNION") GroupGraphPattern)))))
+
+(define MinusGraphPattern
+  (vac
+   (:: (lit/sp "MINUS") GroupGraphPattern)))
+
+;; DataBlockValue
+
+;; InlineDataFull
+
+;; InlineDataOneVar
+
+;; DataBlock
+
+;; InlineData
+
+;; Bind
+
+;; ServiceGraphPattern
+
+(define GraphGraphPattern
+  (vac
+   (:: (lit/sp "GRAPH")
+       VarOrIri
+       GroupGraphPattern)))
+
+(define OptionalGraphPattern
+  (vac
+   (:: (lit/sp "OPTIONAL") VarOrIri GroupGraphPattern)))
+
+(define GraphPatternNotTriples
+  (alternatives GroupOrUnionGraphPattern OptionalGraphPattern
+		MinusGraphPattern GraphGraphPattern))
+
 (define TriplesBlock
   (vac
    (:: (bind-consumed-values->list
 	TriplesSameSubjectPath)
        (:? (:: (drop-consumed (lit/sp "."))
 	       (:? TriplesBlock))))))
- 
+
 (define GroupGraphPatternSub
    (::
     (:? TriplesBlock)))
@@ -405,11 +484,123 @@
 ;	 (:? (lit/sp "."))
 ;	 TriplesBlock))))
 
+(define GroupGraphPattern 
+  (vac
+   (:: (drop-consumed (lit/sp "{"))
+       GroupGraphPatternSub
+       ;;(alternatives SubSelect GroupGraphPatternSub)
+       (drop-consumed (lit/sp "}")))))
+
+;; TriplesTemplate
+
+;; QuadsNotTriples
+
+;; Quads
+
+;; QuadData
+
+;; QuadPattern
+
+;; GraphRefAll
+
+;; GraphRef
+
+;; GraphOrDefault
+
+;; UsingClause
+
+;; InsertClause
+
+;; Delete Clause
+
+;; Modify
+
+;; DeleteWhere
+
+;; DeleteData
+
+;; InsertData
+
+;; Copy
+
+;; Move
+
+;; Add
+
+;; Create
+
+;; Drop
+
+;; Clear
+
+;; Load
+
+;; Update1
+
+;; Update
+
+;; ValuesClause
+
+;; OffsetClause
+
+;; LimitClause
+
+;; LimitOffsetClauses
+
+;; OrderCondition
+
+;; OrderClause
+
+;; HavingClause
+
+;; GroupCondition
+
+;; GroupClause
+
+;; SolutionModifier
+
 (define WhereClause
   (bind-consumed-values->list
    (concatenation
     (bind-consumed->symbol (lit/sp "WHERE"))
     GroupGraphPattern)))
+
+(define SourceSelector iri)
+
+(define NamedGraphClause
+  (concatenation
+   (bind-consumed->symbol (lit/sp "NAMED"))
+   SourceSelector))
+
+(define DefaultGraphClause SourceSelector)
+
+(define DatasetClause
+  (bind-consumed-values->list
+   (concatenation
+    (bind-consumed->symbol (lit/sp "FROM"))
+    (alternatives DefaultGraphClause
+		  NamedGraphClause))))
+
+
+;; AskQuery
+
+;; DescribeQuery
+
+;; ConstructQuery
+
+(define SelectClause
+  (bind-consumed-values->list
+  (concatenation
+   (bind-consumed->symbol (lit/sp "SELECT"))
+   (optional-sequence
+    (alternatives (lit/sp "DISTINCT") (lit/sp "REDUCED")))
+   (alternatives
+    (repetition1
+     (between-fws 
+      (alternatives
+       Var
+       (concatenation (lit/sp "(") Expression (lit/sp "AS") Var (lit/sp ")")))))
+    (lit/sp "*")))))
 
 (define SubSelect
    (:: SelectClause WhereClause));; SolutionModifier ValuesClause))
@@ -417,11 +608,25 @@
 (define SelectQuery
   (:: SelectClause 
       (:* DatasetClause)
-		 WhereClause ))
-;		 SolutionModifier))
+      WhereClause ))
+;;		 SolutionModifier))
 
-;(define SelectQuery*
- ; (bind-consumed-values->alist 'SelectQuery SelectQuery*))
+(define PrefixDecl
+  (bind-consumed-values->list
+   (concatenation
+    (bind-consumed->symbol
+     (between-fws (char-list/lit "PREFIX")))
+    PNAME_NS
+    IRIREF)))
+
+;; BaseDecl
+
+(define Prologue
+  (bind-consumed-values->alist
+   '*PROLOGUE*
+   (repetition PrefixDecl)))
+
+;; UpdateUnit
 
 (define Query*
    (concatenation
@@ -432,6 +637,11 @@
 
 (define Query
   (bind-consumed-values->alist '*QUERY* Query*))
+
+;; QueryUnit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tests
 
 (require-extension lexgen)
 
